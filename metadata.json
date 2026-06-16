@@ -1,0 +1,6 @@
+{
+  "name": "ActuaryVault",
+  "description": "Comprehensive actuarial question bank platform for IFOA and IAI exam preparation. Includes AI processing, search systems, and detailed practices.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

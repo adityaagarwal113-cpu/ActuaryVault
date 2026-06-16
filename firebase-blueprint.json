@@ -1,0 +1,55 @@
+{
+  "entities": {
+    "Question": {
+      "title": "Question",
+      "description": "Actuarial practice question with metadata, answers, examiner reports, and AI explanations",
+      "type": "object",
+      "properties": {
+        "questionId": { "type": "string" },
+        "examBody": { "type": "string", "enum": ["IFOA", "IAI"] },
+        "subject": { "type": "string" },
+        "chapter": { "type": "string" },
+        "topic": { "type": "string" },
+        "difficulty": { "type": "string", "enum": ["Easy", "Medium", "Hard"] },
+        "marks": { "type": "integer" },
+        "commandWord": { "type": "string" },
+        "question": { "type": "string" },
+        "rephrasedQuestion": { "type": "string" },
+        "officialAnswer": { "type": "string" },
+        "markScheme": { "type": "string" },
+        "examinerReport": { "type": "string" },
+        "aiSolution": { "type": "string" },
+        "keyPoints": { "type": "string" },
+        "commonMistakes": { "type": "string" },
+        "source": { "type": "string" },
+        "uploadDate": { "type": "string", "format": "date-time" },
+        "confidenceScore": { "type": "integer" },
+        "status": { "type": "string", "enum": ["approved", "pending", "rejected"] },
+        "approvedBy": { "type": "string" },
+        "approvedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["questionId", "examBody", "subject", "chapter", "topic", "question", "marks", "status"]
+    }
+  },
+  "firestore": {
+    "questions/{questionId}": {
+      "schema": "Question",
+      "description": "Collection of all actuarial practice questions"
+    },
+    "favorites/{favoriteId}": {
+      "schema": {
+        "title": "Favorite",
+        "description": "Saved questions per user",
+        "type": "object",
+        "properties": {
+          "favoriteId": { "type": "string" },
+          "userId": { "type": "string" },
+          "questionId": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["favoriteId", "userId", "questionId"]
+      },
+      "description": "Bookmarked questions for each student user"
+    }
+  }
+}
