@@ -3,7 +3,8 @@ import { Question, ExamBodyType, StudyModeType, SubjectType, PastPaperPdf } from
 import { 
   ChevronRight, ArrowLeft, Filter, BookOpen, Shuffle, FileText, 
   HelpCircle, Sparkles, Award, Layers, ThumbsUp, Bookmark, 
-  CheckCircle, RefreshCw, Eye, Star, Compass, Clock, Timer, ExternalLink
+  CheckCircle, RefreshCw, Eye, Star, Compass, Clock, Timer, ExternalLink,
+  Brain, Upload, Trash2, AlertCircle
 } from "lucide-react";
 import MockExamFlow from "./MockExamFlow";
 import { db } from "../firebase";
@@ -107,6 +108,34 @@ const DEFAULT_CHAPTERS: Record<string, string[]> = {
   "CP3": ["Professional Communication", "Explanation of Mathematical Concepts", "Jargon Elimination"],
   "SP": ["Asset Liability Matching", "Stochastic Modelling", "Investments & Derivatives", "State Superannuation", "Pension Scheme Management", "Solvency Capital Requirement"],
   "SA": ["Strategic Corporate Capitalization", "Enterprise Risk Management", "Longevity Risk Hedging", "Group Reinsurance Strategy"]
+};
+
+const StudyBuddyQuestionCard = ({ index, question }: { index: number; question: any; key?: any }) => {
+  const [revealed, setRevealed] = useState(false);
+  return (
+    <div className="p-4 rounded-xl bg-slate-950 border border-slate-900 space-y-3">
+      <div className="flex justify-between items-start">
+        <h4 className="text-xs font-black text-slate-300 font-sans">
+          Question {index + 1} <span className="text-[10px] text-amber-500">({question.marks} Marks)</span>
+        </h4>
+        <button
+          onClick={() => setRevealed(!revealed)}
+          className="px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 text-[10px] font-bold text-slate-300 border border-slate-800 transition cursor-pointer"
+        >
+          {revealed ? "Hide Solution" : "Reveal Solution"}
+        </button>
+      </div>
+      <p className="text-xs text-white font-sans leading-relaxed whitespace-pre-wrap">{question.question}</p>
+      {revealed && (
+        <div className="mt-3 pt-3 border-t border-slate-900 space-y-1.5">
+          <h5 className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider font-sans">Model Answer:</h5>
+          <p className="text-xs text-slate-300 font-sans leading-relaxed whitespace-pre-wrap bg-slate-900/40 p-3 rounded-lg border border-slate-850">
+            {question.solution}
+          </p>
+        </div>
+      )}
+    </div>
+  );
 };
 
 export default function StudentModule({ 
@@ -320,6 +349,18 @@ export default function StudentModule({
   // Past Paper selector states
   const [selectedTerm, setSelectedTerm] = useState<string | null>(null);
 
+  // AI Notes Buddy State
+  const [notesBuddyFile, setNotesBuddyFile] = useState<File | null>(null);
+  const [notesBuddyProcessing, setNotesBuddyProcessing] = useState<boolean>(false);
+  const [notesBuddyResult, setNotesBuddyResult] = useState<{
+    summary: string;
+    formulas: { name: string; formula: string; context: string }[];
+    definitions: { concept: string; explanation: string }[];
+    mockQuestions: { question: string; marks: number; solution: string }[];
+  } | null>(null);
+  const [notesBuddyError, setNotesBuddyError] = useState<string | null>(null);
+  const [notesBuddyActiveTab, setNotesBuddyActiveTab] = useState<"summary" | "formulas" | "definitions" | "questions">("summary");
+
   // Extract chapters or fallback for general subjects
   const currentChapterList = selectedSubject 
     ? (chaptersMap[selectedSubject] || chaptersMap["CP1"]) 
@@ -337,6 +378,55 @@ export default function StudentModule({
     if (!attemptedQuestionIds.includes(q.questionId)) {
       setAttemptedQuestionIds(prev => [...prev, q.questionId]);
     }
+  };
+
+  const handleUploadNotes = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!notesBuddyFile) return;
+
+    setNotesBuddyProcessing(true);
+    setNotesBuddyError(null);
+    setNotesBuddyResult(null);
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const fileDataUrl = reader.result as string;
+        const response = await fetch("/api/process-notes", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            fileData: fileDataUrl,
+            fileName: notesBuddyFile.name,
+            mimeType: notesBuddyFile.type || "application/pdf",
+            subject: selectedSubject,
+          }),
+        });
+
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.error || "Failed to process revision notes.");
+        }
+
+        const data = await response.json();
+        setNotesBuddyResult(data);
+        setNotesBuddyActiveTab("summary");
+      } catch (err: any) {
+        console.error("Notes processing error:", err);
+        setNotesBuddyError(err.message || "An unexpected error occurred while parsing notes.");
+      } finally {
+        setNotesBuddyProcessing(false);
+      }
+    };
+
+    reader.onerror = () => {
+      setNotesBuddyError("Failed to read the selected file.");
+      setNotesBuddyProcessing(false);
+    };
+
+    reader.readAsDataURL(notesBuddyFile);
   };
 
   // Reset parameters when backing out of subject
@@ -712,6 +802,34 @@ export default function StudentModule({
                         <span>Select Paper Term</span> <ChevronRight className="ml-1 h-4 w-4" />
                       </div>
                     </button>
+
+                    {/* AI Notes Buddy Card */}
+                    <button
+                      onClick={() => {
+                        setSelectedMode("notes-buddy");
+                        setNotesBuddyFile(null);
+                        setNotesBuddyResult(null);
+                        setNotesBuddyError(null);
+                      }}
+                      className="group p-6 rounded-2xl bg-[#090f1d] border border-slate-800 hover:border-amber-500/60 hover:shadow-lg hover:shadow-amber-500/[0.01] transition duration-300 cursor-pointer text-left flex flex-col justify-between relative overflow-hidden sm:col-span-2 text-left"
+                    >
+                      <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/[0.02] blur-xl rounded-full" />
+                      <div>
+                        <div className="w-12 h-12 rounded-xl bg-amber-500/10 text-amber-400 group-hover:bg-amber-500 group-hover:text-slate-950 flex items-center justify-center transition mb-5 border border-amber-500/20">
+                          <Brain className="h-6 w-6" />
+                        </div>
+                        <h3 className="font-display font-bold text-lg text-white group-hover:text-amber-400 transition flex items-center gap-2">
+                          AI Notes Buddy
+                          <span className="text-[9px] bg-amber-400/10 text-amber-300 border border-amber-400/20 px-1.5 py-0.5 rounded-full uppercase tracking-widest font-black">BETA</span>
+                        </h3>
+                        <p className="text-slate-400 text-xs mt-2 leading-relaxed">
+                          Upload your personal revision notes, lecture slides, formulas, or summaries (PDF, images, TXT) to automatically convert them into instant interactive study summary cards, LaTeX formulas, core concept definitions, and customized practice mock questions!
+                        </p>
+                      </div>
+                      <div className="mt-8 flex items-center text-xs font-semibold text-amber-400 uppercase tracking-wider">
+                        <span>Launch Study Buddy</span> <ChevronRight className="ml-1 h-4 w-4" />
+                      </div>
+                    </button>
                   </div>
                 </div>
               ) : selectedMode === "mock-exam" ? (
@@ -722,6 +840,303 @@ export default function StudentModule({
                   chaptersMap={chaptersMap}
                   onBack={() => setSelectedMode(null)}
                 />
+              ) : selectedMode === "notes-buddy" ? (
+                <div className="max-w-5xl mx-auto py-6">
+                  {/* Notes Buddy view header */}
+                  <div className="flex flex-wrap items-center justify-between gap-4 mb-6 border-b border-slate-800 pb-5">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className="font-mono text-xs font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded">
+                          AI STUDY BUDDY
+                        </span>
+                        <span className="font-mono text-xs font-bold bg-slate-800 text-slate-300 border border-slate-700/60 px-2 py-0.5 rounded uppercase">
+                          {selectedSubject}
+                        </span>
+                      </div>
+                      <h2 className="text-2xl font-display font-bold text-white tracking-tight">
+                        Interactive Notes Parser & Flashcard Generator
+                      </h2>
+                      <p className="text-slate-400 text-xs mt-1 leading-relaxed">
+                        Transform your lecture files or personal summaries into custom formula sheets, definitions, and realistic mock questions.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setSelectedMode(null)}
+                      className="px-4 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 text-xs font-medium transition cursor-pointer flex items-center gap-1.5"
+                    >
+                      <ArrowLeft className="h-4 w-4" /> Change Mode
+                    </button>
+                  </div>
+
+                  {/* Main section: Upload form or Active Results */}
+                  {!notesBuddyResult ? (
+                    <div className="max-w-2xl mx-auto bg-slate-950/40 rounded-2xl border border-slate-800 p-8 shadow-xl text-center space-y-6">
+                      <div className="mx-auto w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-center text-amber-400">
+                        <Brain className="h-8 w-8 animate-pulse" />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <h3 className="text-lg font-display font-bold text-white">Upload Your Study Material</h3>
+                        <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
+                          Drag and drop your lecture notes, formula lists, hand-written snapshots, textbook chapters, or summary sheets. Our AI model will extract active practice tools for you.
+                        </p>
+                      </div>
+
+                      <form onSubmit={handleUploadNotes} className="space-y-4">
+                        <label className="block">
+                          <div className="border-2 border-dashed border-slate-800 hover:border-amber-500/50 rounded-2xl p-8 cursor-pointer bg-slate-900/10 hover:bg-slate-900/30 transition flex flex-col items-center justify-center space-y-2 group">
+                            <Upload className="h-8 w-8 text-slate-500 group-hover:text-amber-400 transition" />
+                            <span className="text-xs font-semibold text-slate-300 group-hover:text-white transition">
+                              {notesBuddyFile ? notesBuddyFile.name : "Choose a PDF, image, txt, or document file"}
+                            </span>
+                            <span className="text-[10px] text-slate-500">
+                              {notesBuddyFile ? `${(notesBuddyFile.size / 1024 / 1024).toFixed(2)} MB` : "Max file size: 25MB"}
+                            </span>
+                            <input
+                              type="file"
+                              className="hidden"
+                              accept=".pdf,.txt,.png,.jpg,.jpeg,.doc,.docx"
+                              onChange={(e) => {
+                                if (e.target.files && e.target.files[0]) {
+                                  setNotesBuddyFile(e.target.files[0]);
+                                  setNotesBuddyError(null);
+                                }
+                              }}
+                            />
+                          </div>
+                        </label>
+
+                        {notesBuddyError && (
+                          <div className="bg-rose-500/10 border border-rose-500/25 p-3 rounded-xl flex items-start gap-2.5 text-left text-xs text-rose-300">
+                            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                            <p>{notesBuddyError}</p>
+                          </div>
+                        )}
+
+                        <div className="flex gap-2 justify-center">
+                          {notesBuddyFile && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setNotesBuddyFile(null);
+                                setNotesBuddyError(null);
+                              }}
+                              className="px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer"
+                            >
+                              <Trash2 className="h-4 w-4" /> Reset
+                            </button>
+                          )}
+                          <button
+                            type="submit"
+                            disabled={notesBuddyProcessing || !notesBuddyFile}
+                            className={`px-6 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition cursor-pointer ${
+                              notesBuddyProcessing || !notesBuddyFile
+                                ? "bg-slate-800 text-slate-500 border border-slate-700/50 cursor-not-allowed"
+                                : "bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold shadow-lg shadow-amber-500/10"
+                            }`}
+                          >
+                            {notesBuddyProcessing ? (
+                              <>
+                                <RefreshCw className="h-4 w-4 animate-spin text-slate-950" />
+                                Analyzing Study Notes...
+                              </>
+                            ) : (
+                              <>
+                                <Sparkles className="h-4 w-4 text-slate-950" />
+                                Convert to Active Study Tools
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </form>
+
+                      {notesBuddyProcessing && (
+                        <div className="pt-4 space-y-2 max-w-sm mx-auto animate-pulse">
+                          <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
+                            <div className="bg-gradient-to-r from-amber-500 to-amber-300 h-full rounded-full animate-pulse" style={{ width: "85%" }} />
+                          </div>
+                          <p className="text-[10px] font-mono text-amber-400">
+                            Gemini AI is parsing formula blocks & synthesising mock questions...
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    /* Active Study Buddy Result Dashboard */
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+                      {/* Left navigation column */}
+                      <div className="md:col-span-4 bg-slate-950/40 rounded-2xl border border-slate-800 p-5 shadow-xl space-y-4">
+                        <div className="flex items-center gap-2.5 pb-3 border-b border-slate-800">
+                          <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-400">
+                            <Brain className="h-4 w-4" />
+                          </div>
+                          <div className="text-left">
+                            <h4 className="text-xs font-bold text-white uppercase tracking-wider">Workspace Deck</h4>
+                            <span className="text-[10px] text-slate-500 block truncate max-w-[180px]">Processed from {notesBuddyFile?.name}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col gap-2">
+                          <button
+                            onClick={() => setNotesBuddyActiveTab("summary")}
+                            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2.5 border ${
+                              notesBuddyActiveTab === "summary"
+                                ? "bg-amber-500/10 border-amber-500/30 text-amber-400 shadow-sm"
+                                : "bg-transparent border-transparent text-slate-400 hover:text-slate-200"
+                            }`}
+                          >
+                            <FileText className="h-4 w-4 shrink-0" /> Summary & Overview
+                          </button>
+
+                          <button
+                            onClick={() => setNotesBuddyActiveTab("formulas")}
+                            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2.5 border ${
+                              notesBuddyActiveTab === "formulas"
+                                ? "bg-amber-500/10 border-amber-500/30 text-amber-400 shadow-sm"
+                                : "bg-transparent border-transparent text-slate-400 hover:text-slate-200"
+                            }`}
+                          >
+                            <BookOpen className="h-4 w-4 shrink-0" /> Actuarial Formula Sheet
+                            <span className="ml-auto text-[9px] bg-slate-900 border border-slate-800 text-slate-400 px-1.5 py-0.5 rounded-full shrink-0">
+                              {notesBuddyResult.formulas?.length || 0}
+                            </span>
+                          </button>
+
+                          <button
+                            onClick={() => setNotesBuddyActiveTab("definitions")}
+                            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2.5 border ${
+                              notesBuddyActiveTab === "definitions"
+                                ? "bg-amber-500/10 border-amber-500/30 text-amber-400 shadow-sm"
+                                : "bg-transparent border-transparent text-slate-400 hover:text-slate-200"
+                            }`}
+                          >
+                            <Layers className="h-4 w-4 shrink-0" /> Concepts & Glossary
+                            <span className="ml-auto text-[9px] bg-slate-900 border border-slate-800 text-slate-400 px-1.5 py-0.5 rounded-full shrink-0">
+                              {notesBuddyResult.definitions?.length || 0}
+                            </span>
+                          </button>
+
+                          <button
+                            onClick={() => setNotesBuddyActiveTab("questions")}
+                            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2.5 border ${
+                              notesBuddyActiveTab === "questions"
+                                ? "bg-amber-500/10 border-amber-500/30 text-amber-400 shadow-sm"
+                                : "bg-transparent border-transparent text-slate-400 hover:text-slate-200"
+                            }`}
+                          >
+                            <HelpCircle className="h-4 w-4 shrink-0" /> Synthesized Mock Questions
+                            <span className="ml-auto text-[9px] bg-slate-900 border border-slate-800 text-slate-400 px-1.5 py-0.5 rounded-full shrink-0">
+                              {notesBuddyResult.mockQuestions?.length || 0}
+                            </span>
+                          </button>
+                        </div>
+
+                        <div className="pt-4 border-t border-slate-800">
+                          <button
+                            onClick={() => {
+                              setNotesBuddyResult(null);
+                              setNotesBuddyFile(null);
+                            }}
+                            className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-800 text-slate-300 text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-1.5"
+                          >
+                            <RefreshCw className="h-3.5 w-3.5" /> Upload Different Notes
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Right Workspace detail column */}
+                      <div className="md:col-span-8 bg-[#090f1d] rounded-2xl border border-slate-800 p-6 shadow-xl relative overflow-hidden min-h-[400px]">
+                        {/* Tab Content: Summary */}
+                        {notesBuddyActiveTab === "summary" && (
+                          <div className="space-y-4 text-left">
+                            <h3 className="font-display font-bold text-lg text-white flex items-center gap-1.5">
+                              <FileText className="h-5 w-5 text-amber-400" />
+                              Summary & Key Pillars
+                            </h3>
+                            <div className="p-4 rounded-xl bg-slate-950 border border-slate-900 text-slate-300 text-xs leading-relaxed whitespace-pre-wrap font-sans">
+                              {notesBuddyResult.summary}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Tab Content: Formulas */}
+                        {notesBuddyActiveTab === "formulas" && (
+                          <div className="space-y-4 text-left">
+                            <h3 className="font-display font-bold text-lg text-white flex items-center gap-1.5">
+                              <BookOpen className="h-5 w-5 text-amber-400" />
+                              Actuarial Formula Sheet
+                            </h3>
+                            {!notesBuddyResult.formulas || notesBuddyResult.formulas.length === 0 ? (
+                              <p className="text-xs text-slate-500">No mathematical formulas were extracted from the upload.</p>
+                            ) : (
+                              <div className="space-y-3">
+                                {notesBuddyResult.formulas.map((formObj, idx) => (
+                                  <div key={idx} className="p-4 rounded-xl bg-slate-950 border border-slate-900 space-y-2">
+                                    <h4 className="text-xs font-bold text-white uppercase tracking-wide font-sans">{formObj.name}</h4>
+                                    <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-850 text-center text-sm font-mono text-sky-400 select-all overflow-x-auto py-4">
+                                      {formObj.formula}
+                                    </div>
+                                    {formObj.context && (
+                                      <p className="text-[11px] text-slate-400 font-sans leading-relaxed">
+                                        <strong className="text-slate-300">Variables/Context:</strong> {formObj.context}
+                                      </p>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Tab Content: Definitions */}
+                        {notesBuddyActiveTab === "definitions" && (
+                          <div className="space-y-4 text-left">
+                            <h3 className="font-display font-bold text-lg text-white flex items-center gap-1.5">
+                              <Layers className="h-5 w-5 text-amber-400" />
+                              Actuarial Concepts & Glossary
+                            </h3>
+                            {!notesBuddyResult.definitions || notesBuddyResult.definitions.length === 0 ? (
+                              <p className="text-xs text-slate-500">No core glossary terms were extracted from the upload.</p>
+                            ) : (
+                              <div className="grid grid-cols-1 gap-3">
+                                {notesBuddyResult.definitions.map((defObj, idx) => (
+                                  <div key={idx} className="p-4 rounded-xl bg-slate-950 border border-slate-900 space-y-1">
+                                    <h4 className="text-xs font-black text-amber-400 tracking-wide font-sans">{defObj.concept}</h4>
+                                    <p className="text-xs text-slate-300 leading-relaxed font-sans">{defObj.explanation}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Tab Content: Synthesized Questions */}
+                        {notesBuddyActiveTab === "questions" && (
+                          <div className="space-y-4 text-left">
+                            <div className="flex items-center justify-between">
+                              <h3 className="font-display font-bold text-lg text-white flex items-center gap-1.5">
+                                <HelpCircle className="h-5 w-5 text-amber-400" />
+                                Synthesized Mock Questions
+                              </h3>
+                              <span className="text-[10px] bg-amber-400/10 text-amber-400 border border-amber-400/20 px-2 py-0.5 rounded-full font-bold uppercase font-mono">
+                                Custom Mock
+                              </span>
+                            </div>
+                            {!notesBuddyResult.mockQuestions || notesBuddyResult.mockQuestions.length === 0 ? (
+                              <p className="text-xs text-slate-500">No mock questions could be synthesized from your revision notes.</p>
+                            ) : (
+                              <div className="space-y-4">
+                                {notesBuddyResult.mockQuestions.map((qObj, idx) => (
+                                  <StudyBuddyQuestionCard key={idx} index={idx} question={qObj} />
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               ) : (
 
                 /* 4. ACTIVE PRACTICE STUDY MODULE VIEWPORTS */

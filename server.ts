@@ -260,6 +260,100 @@ JSON Schema:
     }
   });
 
+  // Process student revision notes to create custom summaries, formula sheets, and flashcards
+  app.post("/api/process-notes", async (req, res) => {
+    try {
+      const { fileData, fileName, mimeType, subject } = req.body;
+
+      if (!fileData) {
+        res.status(400).json({ error: "No file data provided." });
+        return;
+      }
+
+      if (!process.env.GEMINI_API_KEY) {
+        res.status(500).json({ error: "GEMINI_API_KEY is not configured on the server." });
+        return;
+      }
+
+      const cleanBase64 = fileData.replace(/^data:.*?;base64,/, "");
+
+      const promptText = `You are an expert actuarial study coach and mentor.
+A student has uploaded their personal revision notes, lecture slides, or study summaries for Subject: ${subject || "Core Actuarial Studies"}.
+
+Your task is to analyze these notes and synthesize them into highly structured, student-friendly interactive study assets.
+Extract:
+1. A concise, easy-to-read "summary" of the main topics covered.
+2. An array of "formulas": core mathematical/actuarial formulas, nicely formatted with standard LaTeX or clear math notations.
+3. An array of "definitions": key concepts, acronyms, or theories with clean student-friendly explanations.
+4. An array of "mockQuestions": 3-4 custom practice questions generated directly from these notes to test their understanding, including a detailed "solution" for each.
+
+You MUST respond with a single valid JSON object matching the schema below. No markdown block wrappers around the JSON, just the raw JSON text.
+
+JSON Schema:
+{
+  "summary": "Brief student-friendly summary of the note contents...",
+  "formulas": [
+    {
+      "name": "Name of formula",
+      "formula": "LaTeX formula expression, e.g. \\\\ddot{a}_x = \\\\sum_{t=0}^{\\\\infty} v^t \\\\,_tp_x",
+      "context": "Brief context or variables definition"
+    }
+  ],
+  "definitions": [
+    {
+      "concept": "Concept Name",
+      "explanation": "Clear, intuitive explanation of this concept"
+    }
+  ],
+  "mockQuestions": [
+    {
+      "question": "Custom test question based on their notes...",
+      "marks": 5, // reasonable marks
+      "solution": "Step-by-step mathematical or qualitative derivation solution"
+    }
+  ]
+}
+
+Double check that the response is parseable by JSON.parse. Avoid trailing commas or comments. Start the response with { and end with }.`;
+
+      const contentsPayload = [
+        {
+          inlineData: {
+            data: cleanBase64,
+            mimeType: mimeType || "application/pdf"
+          }
+        },
+        promptText
+      ];
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.5-flash",
+        contents: contentsPayload,
+        config: {
+          responseMimeType: "application/json"
+        }
+      });
+
+      const responseText = response.text;
+      if (!responseText) {
+        throw new Error("Empty response returned from Gemini API.");
+      }
+
+      let parsedData;
+      try {
+        parsedData = JSON.parse(responseText.trim());
+      } catch (e) {
+        const cleaned = responseText.replace(/```json/g, "").replace(/```/g, "").trim();
+        parsedData = JSON.parse(cleaned);
+      }
+
+      res.json(parsedData);
+    } catch (error: any) {
+      console.error("Notes processing error:", error);
+      res.status(500).json({ error: error.message || "An error occurred during notes processing." });
+    }
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
