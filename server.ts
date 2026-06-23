@@ -3,6 +3,7 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
+import fs from "fs";
 
 dotenv.config();
 
@@ -20,6 +21,13 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // Serve uploads folder statically in both development and production
+  const uploadsPath = path.join(process.cwd(), "uploads");
+  if (!fs.existsSync(uploadsPath)) {
+    fs.mkdirSync(uploadsPath, { recursive: true });
+  }
+  app.use("/uploads", express.static(uploadsPath));
+
   // Body parser with 50mb limit to handle high-res image and PDF uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
@@ -27,6 +35,32 @@ async function startServer() {
   // API routes FIRST
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
+  });
+
+  // Handle saving of uploaded past paper PDFs directly to the server files
+  app.post("/api/upload-pdf", async (req, res) => {
+    try {
+      const { fileData, fileName } = req.body;
+      if (!fileData) {
+        res.status(400).json({ error: "No file data provided." });
+        return;
+      }
+
+      const cleanBase64 = fileData.replace(/^data:.*?;base64,/, "");
+      const buffer = Buffer.from(cleanBase64, "base64");
+      
+      // Sanitise filename to prevent path traversal
+      const safeName = (fileName || `upload_${Date.now()}.pdf`).replace(/[^a-zA-Z0-9_.-]/g, "_");
+      const filePath = path.join(uploadsPath, safeName);
+      
+      fs.writeFileSync(filePath, buffer);
+      
+      // Return relative path from server root
+      res.json({ pdfUrl: `/uploads/${safeName}` });
+    } catch (error: any) {
+      console.error("File upload error:", error);
+      res.status(500).json({ error: error.message || "An error occurred during file saving." });
+    }
   });
 
   // Process uploaded documents/images and extract structured actuarial questions
@@ -130,6 +164,99 @@ Double check that the response is parseable by JSON.parse. Avoid trailing commas
     } catch (error: any) {
       console.error("AI processing error:", error);
       res.status(500).json({ error: error.message || "An error occurred during AI processing." });
+    }
+  });
+
+  // Evaluate student answer sheet/file against questions and marking rubrics
+  app.post("/api/evaluate-answers", async (req, res) => {
+    try {
+      const { questions, studentAnswersText, fileData, fileName, mimeType } = req.body;
+
+      if (!questions || !Array.isArray(questions)) {
+        res.status(400).json({ error: "Questions list is required." });
+        return;
+      }
+
+      if (!process.env.GEMINI_API_KEY) {
+        res.status(500).json({ error: "GEMINI_API_KEY is not configured on the server." });
+        return;
+      }
+
+      let contentsPayload: any[] = [];
+      let systemPrompt = `You are an expert actuarial examiner. Your task is to evaluate and grade a student's answer sheet against a set of questions, their official model answers, and their marking schemes.
+
+Questions with official solutions and rubrics to grade:
+${JSON.stringify(questions, null, 2)}
+
+Please evaluate the student's work. Be precise, fair, and professional.
+Evaluate their mathematical logic, formulae derivation, and qualitative justifications.
+For each question, allocate marks (up to the maximum marks specified for that question) according to the marking scheme. Highlight what key concepts were missed, what common mistakes they fell into, and provide clear remedial advice.
+
+Provide an overall score (sum of marks awarded) and general constructive comments.
+
+You MUST respond with a single valid JSON object matching the JSON schema below. No markdown block wrappers around the JSON, just the raw JSON text.
+
+JSON Schema:
+{
+  "overallScore": 34, // Sum of all marks awarded (must be an integer)
+  "maxMarks": 100, // Sum of max marks of all questions (must be an integer)
+  "feedback": [
+    {
+      "questionId": "string id of the question",
+      "marksAwarded": 8, // Integer marks awarded
+      "maxMarks": 10, // Integer max marks of this question
+      "comments": "Detailed explanation of why marks were awarded or deducted",
+      "keyMissedConcepts": "Concepts or steps they missed",
+      "remedialAdvice": "How they can improve or what to study"
+    }
+  ],
+  "generalComments": "General summary feedback for the candidate's paper"
+}
+`;
+
+      if (studentAnswersText) {
+        systemPrompt += `\n\nStudent's typed answers:\n${studentAnswersText}`;
+      }
+
+      if (fileData) {
+        const cleanBase64 = fileData.replace(/^data:.*?;base64,/, "");
+        contentsPayload.push({
+          inlineData: {
+            data: cleanBase64,
+            mimeType: mimeType || "application/pdf"
+          }
+        });
+        systemPrompt += `\n\nAdditionally, the student has uploaded an answer file (${fileName || "submission"}) which contains their written/calculation work. Please read this file to grade their answers.`;
+      }
+
+      contentsPayload.push(systemPrompt);
+
+      // Call the model using the recommended gemini-3.5-flash
+      const response = await ai.models.generateContent({
+        model: "gemini-3.5-flash",
+        contents: contentsPayload,
+        config: {
+          responseMimeType: "application/json"
+        }
+      });
+
+      const responseText = response.text;
+      if (!responseText) {
+        throw new Error("Empty response returned from Gemini API.");
+      }
+
+      let parsedData;
+      try {
+        parsedData = JSON.parse(responseText.trim());
+      } catch (e) {
+        const cleaned = responseText.replace(/```json/g, "").replace(/```/g, "").trim();
+        parsedData = JSON.parse(cleaned);
+      }
+
+      res.json(parsedData);
+    } catch (error: any) {
+      console.error("AI evaluation error:", error);
+      res.status(500).json({ error: error.message || "An error occurred during AI evaluation." });
     }
   });
 

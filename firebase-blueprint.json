@@ -29,12 +29,47 @@
         "approvedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["questionId", "examBody", "subject", "chapter", "topic", "question", "marks", "status"]
+    },
+    "PastPaper": {
+      "title": "PastPaper",
+      "description": "Direct Past Paper PDF attachment linked to an exam, subject and term",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "examBody": { "type": "string", "enum": ["IFOA", "IAI"] },
+        "subject": { "type": "string" },
+        "term": { "type": "string" },
+        "pdfUrl": { "type": "string" },
+        "uploadedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "examBody", "subject", "term", "pdfUrl"]
+    },
+    "SubjectConfig": {
+      "title": "SubjectConfig",
+      "description": "Configuration mapping a subject to its list of chapters",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "subject": { "type": "string" },
+        "chapters": {
+          "type": "array"
+        }
+      },
+      "required": ["id", "subject", "chapters"]
     }
   },
   "firestore": {
+    "subjects/{subjectId}": {
+      "schema": "SubjectConfig",
+      "description": "Custom subjects and their chapters configured from the admin panel"
+    },
     "questions/{questionId}": {
       "schema": "Question",
       "description": "Collection of all actuarial practice questions"
+    },
+    "past_papers/{paperId}": {
+      "schema": "PastPaper",
+      "description": "Collection of PDF documents linked directly to specific past paper terms"
     },
     "favorites/{favoriteId}": {
       "schema": {
@@ -50,6 +85,24 @@
         "required": ["favoriteId", "userId", "questionId"]
       },
       "description": "Bookmarked questions for each student user"
+    },
+    "user_progress/{progressId}": {
+      "schema": {
+        "title": "UserProgress",
+        "description": "Tracking status of completed or mastered chapters and questions for each student user",
+        "type": "object",
+        "properties": {
+          "progressId": { "type": "string" },
+          "userId": { "type": "string" },
+          "type": { "type": "string", "enum": ["chapter", "question"] },
+          "subject": { "type": "string" },
+          "targetId": { "type": "string" },
+          "status": { "type": "string", "enum": ["completed", "mastered"] },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["progressId", "userId", "type", "targetId", "status", "updatedAt"]
+      },
+      "description": "Progress tracking for chapters and questions per user"
     }
   }
 }

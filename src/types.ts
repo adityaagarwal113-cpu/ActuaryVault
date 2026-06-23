@@ -48,4 +48,14 @@ export interface Favorite {
   createdAt: string;
 }
 
-export type StudyModeType = "chapter-wise" | "mixed" | "past-papers";
+export type StudyModeType = "chapter-wise" | "mixed" | "past-papers" | "mock-exam";
+
+export interface PastPaperPdf {
+  id: string;
+  examBody: ExamBodyType;
+  subject: string;
+  term: string;
+  pdfUrl: string;
+  uploadedAt: string;
+}
+

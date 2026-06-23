@@ -5,12 +5,12 @@ import AdminPanel from "./components/AdminPanel";
 import AuthModal from "./components/AuthModal";
 import BookmarksDrawer from "./components/BookmarksDrawer";
 import GlobalSearchModal from "./components/GlobalSearchModal";
-import { Question } from "./types";
+import { Question, PastPaperPdf } from "./types";
 import { initialQuestions } from "./utils/seedData";
 import { db, auth } from "./firebase";
 import { collection, getDocs, addDoc } from "firebase/firestore";
 import { onAuthStateChanged, signOut, User } from "firebase/auth";
-import { ShieldAlert, BookOpen, Layers, Check, Sparkles, RefreshCw, KeyRound, Star } from "lucide-react";
+import { ShieldAlert, BookOpen, Layers, Check, Sparkles, RefreshCw, KeyRound, Star, Clock, Compass, HelpCircle, GraduationCap } from "lucide-react";
 
 export default function App() {
   // Application Roles and views
@@ -19,7 +19,22 @@ export default function App() {
 
   // Database core state
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [pastPapers, setPastPapers] = useState<PastPaperPdf[]>([]);
   const [loadingDb, setLoadingDb] = useState<boolean>(true);
+
+  // Sync Past Papers database from Firestore
+  const fetchPastPapersFromFirestore = async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, "past_papers"));
+      const list: PastPaperPdf[] = [];
+      querySnapshot.forEach((doc) => {
+        list.push({ id: doc.id, ...doc.data() } as PastPaperPdf);
+      });
+      setPastPapers(list);
+    } catch (err) {
+      console.warn("Sync warning: Could not fetch past papers from Firestore", err);
+    }
+  };
 
   // Bookmark favorites state list
   const [favorites, setFavorites] = useState<string[]>([]);
@@ -74,6 +89,7 @@ export default function App() {
   // Fetch collections on startup
   useEffect(() => {
     fetchQuestionsFromFirestore();
+    fetchPastPapersFromFirestore();
   }, []);
 
   // Bookmarking load/save synchronization
@@ -133,30 +149,91 @@ export default function App() {
       />
 
       {/* Hero Welcome Announcement */}
-      <header className="bg-[#0F172A] border-b border-slate-800 text-white py-12 px-4 shadow-inner relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(14,165,233,0.15),rgba(255,255,255,0))]" />
-        <div className="max-w-4xl mx-auto text-center relative z-10 space-y-3">
-          <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-sky-400 to-indigo-600 shadow-xl flex items-center justify-center mx-auto mb-4 border border-slate-700">
-            <Layers className="h-8 w-8 text-white" />
+      <header className="bg-gradient-to-b from-[#020512] via-[#0b132a] to-[#020617] border-b border-slate-800/60 text-white py-16 px-4 relative overflow-hidden">
+        {/* Soft immersive ambient lights */}
+        <div className="absolute top-[-50px] left-1/4 w-[400px] h-[300px] bg-sky-500/10 blur-[120px] rounded-full pointer-events-none" />
+        <div className="absolute top-[-50px] right-1/4 w-[400px] h-[300px] bg-indigo-500/10 blur-[120px] rounded-full pointer-events-none" />
+        
+        <div className="max-w-5xl mx-auto text-center relative z-10 space-y-6">
+          
+          {/* Charming Welcoming Badge */}
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-sky-500/10 to-indigo-500/10 border border-sky-400/20 rounded-full text-xs font-semibold text-sky-400 tracking-wide shadow-inner shadow-sky-500/5 backdrop-blur-sm">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-500"></span>
+            </span>
+            🚀 Elevate Your Actuarial Exam Preparation
           </div>
-          <h1 className="text-3xl sm:text-4xl font-display font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-350 bg-clip-text text-transparent">
-            Continuous Actuarial Exam Excellence
-          </h1>
-          <p className="text-slate-400 text-sm max-w-lg mx-auto sm:text-base leading-relaxed">
-            The world's premium interactive question bank platform aligned with official IFOA and IAI examination subjects.
-          </p>
 
-          <div className="flex flex-wrap items-center justify-center gap-3 pt-4 text-xs font-mono">
-            <div className="px-3 py-1 rounded-full bg-slate-800/80 border border-slate-700/60 text-slate-300">
-              ⚡ Live OCR Pipeline
-            </div>
-            <div className="px-3 py-1 rounded-full bg-slate-800/80 border border-slate-700/60 text-slate-300">
-              💎 Fully Editable Queue
-            </div>
-            <div className="px-3 py-1 rounded-full bg-slate-800/80 border border-slate-700/60 text-slate-300">
-              🎓 Safe Syllabus Rephrasing
-            </div>
+          {/* Eye-catching responsive Brand Typography */}
+          <div className="space-y-3">
+            <h1 className="text-4xl sm:text-6xl font-display font-extrabold tracking-tight text-white leading-tight">
+              Actuary<span className="bg-gradient-to-r from-sky-400 via-sky-300 to-indigo-400 bg-clip-text text-transparent">Vault</span>
+            </h1>
+            <p className="text-slate-300 text-sm max-w-2xl mx-auto sm:text-base leading-relaxed font-sans font-medium">
+              Your ultimate student-friendly companion for mastering the <span className="text-sky-300 font-bold">IFoA & Core Actuarial syllabi</span>. Access high-fidelity mock simulators, step-by-step guidance, and real past-paper solutions tailored exactly to your curriculum goals.
+            </p>
           </div>
+
+          {/* Grid of Student-Friendly Bento Feature Highlights */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 pt-6 text-left">
+            
+            {/* Bento Card 1: Exam Simulators */}
+            <div className="relative group p-5 bg-slate-900/60 hover:bg-slate-900/90 border border-slate-800/80 hover:border-sky-500/40 rounded-2xl transition duration-300 shadow-md flex flex-col justify-between">
+              <div className="absolute top-0 right-0 w-20 h-20 bg-sky-500/5 blur-xl group-hover:bg-sky-500/10 transition rounded-full" />
+              <div>
+                <div className="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 mb-3 group-hover:scale-110 transition duration-300">
+                  <Clock className="h-5 w-5" />
+                </div>
+                <h3 className="text-sm font-bold text-slate-100 group-hover:text-sky-400 transition">Interactive Mock Simulators</h3>
+                <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed font-sans">
+                  Generate timed mock papers matching your target chapters. Adjust durations, test specific topics, and build real exam stamina.
+                </p>
+              </div>
+              <div className="mt-4 pt-3 border-t border-slate-800/50 flex items-center justify-between text-[10px] font-mono text-sky-400/80">
+                <span>⚡ Real-Time Timer</span>
+                <span>Unlimited generation</span>
+              </div>
+            </div>
+
+            {/* Bento Card 2: AI Explanations */}
+            <div className="relative group p-5 bg-slate-900/60 hover:bg-slate-900/90 border border-slate-800/80 hover:border-indigo-500/40 rounded-2xl transition duration-300 shadow-md flex flex-col justify-between">
+              <div className="absolute top-0 right-0 w-20 h-20 bg-indigo-500/5 blur-xl group-hover:bg-indigo-500/10 transition rounded-full" />
+              <div>
+                <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mb-3 group-hover:scale-110 transition duration-300">
+                  <Sparkles className="h-5 w-5" />
+                </div>
+                <h3 className="text-sm font-bold text-slate-100 group-hover:text-indigo-400 transition">Syllabus Rephrasing</h3>
+                <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed font-sans">
+                  Stuck on cryptic question wording? Read simplified, jargon-free versions alongside step-by-step mathematical breakdowns.
+                </p>
+              </div>
+              <div className="mt-4 pt-3 border-t border-slate-800/50 flex items-center justify-between text-[10px] font-mono text-indigo-400/80">
+                <span>🤖 Intelligent Helper</span>
+                <span>Active study buddy</span>
+              </div>
+            </div>
+
+            {/* Bento Card 3: Dynamic Navigator */}
+            <div className="relative group p-5 bg-slate-900/60 hover:bg-slate-900/90 border border-slate-800/80 hover:border-emerald-500/40 rounded-2xl transition duration-300 shadow-md flex flex-col justify-between">
+              <div className="absolute top-0 right-0 w-20 h-20 bg-emerald-500/5 blur-xl group-hover:bg-emerald-500/10 transition rounded-full" />
+              <div>
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-3 group-hover:scale-110 transition duration-300">
+                  <BookOpen className="h-5 w-5" />
+                </div>
+                <h3 className="text-sm font-bold text-slate-100 group-hover:text-emerald-400 transition">Curriculum Navigator</h3>
+                <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed font-sans">
+                  Explore approved past papers categorized strictly by core subjects (CM1, CS2, SP, etc.) and complete individual chapter checks.
+                </p>
+              </div>
+              <div className="mt-4 pt-3 border-t border-slate-800/50 flex items-center justify-between text-[10px] font-mono text-emerald-400/80">
+                <span>📁 Mapped Syllabus</span>
+                <span>Instant past papers</span>
+              </div>
+            </div>
+
+          </div>
+
         </div>
       </header>
 
@@ -169,13 +246,20 @@ export default function App() {
           </div>
         ) : currentRole === "admin" ? (
           /* ADMIN WORKSPACE PANEL */
-          <AdminPanel questions={questions} onRefreshDatabase={fetchQuestionsFromFirestore} />
+          <AdminPanel 
+            questions={questions} 
+            pastPapers={pastPapers}
+            onRefreshDatabase={fetchQuestionsFromFirestore} 
+            onRefreshPastPapers={fetchPastPapersFromFirestore}
+          />
         ) : (
           /* STUDENT PRACTICE WORKSPACE */
           <StudentModule
             questions={questions}
+            pastPapers={pastPapers}
             favorites={favorites}
             onToggleFavorite={handleToggleFavorite}
+            user={user}
           />
         )}
       </main>

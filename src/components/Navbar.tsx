@@ -24,13 +24,17 @@ export default function Navbar({
   onOpenSearch,
 }: NavbarProps) {
   return (
-    <nav className="sticky top-0 z-40 bg-[#0F172A] border-b border-slate-800 text-white shadow-xl">
+    <nav className="sticky top-0 z-40 bg-[#030712]/90 backdrop-blur-md border-b border-slate-800/80 text-white shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <div className="flex items-center gap-3 cursor-pointer" onClick={() => window.location.reload()}>
-            <div className="w-8 h-8 bg-sky-500 rounded-lg flex items-center justify-center font-bold text-slate-900 shrink-0">AV</div>
-            <span className="text-xl font-semibold tracking-tight text-white italic underline decoration-sky-500 underline-offset-4">ActuaryVault</span>
+          <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => window.location.reload()}>
+            <div className="w-8 h-8 bg-gradient-to-tr from-sky-400 to-indigo-500 rounded-lg flex items-center justify-center font-display font-bold text-slate-950 shrink-0 text-sm shadow-md shadow-sky-500/10">
+              AV
+            </div>
+            <span className="text-lg font-display font-extrabold tracking-tight text-white">
+              Actuary<span className="text-sky-400 font-light">Vault</span>
+            </span>
           </div>
 
           {/* Navigation & Search Trigger */}
@@ -49,7 +53,7 @@ export default function Navbar({
             {/* Favorites bookmark badge */}
             <button
               onClick={onToggleBookmarks}
-              className="relative p-2 rounded-lg bg-slate-800/40 hover:bg-slate-850 text-slate-300 hover:text-sky-400 transition"
+              className="relative p-2 rounded-lg bg-slate-800/40 hover:bg-slate-800 text-slate-300 hover:text-sky-400 transition"
               title="Saved Questions"
               id="favorites-shortcut"
             >
@@ -67,7 +71,7 @@ export default function Navbar({
                 onClick={() => onRoleChange("student")}
                 className={`px-3 py-1 rounded-lg font-medium transition ${
                   currentRole === "student"
-                    ? "bg-slate-850 text-sky-400 shadow border border-slate-800"
+                    ? "bg-slate-800 text-sky-400 shadow border border-slate-700/60"
                     : "text-slate-400 hover:text-slate-200"
                 }`}
               >

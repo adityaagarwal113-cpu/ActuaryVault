@@ -5,8 +5,17 @@ service cloud.firestore {
       allow read: if true;
       allow write: if true; // Allow all for prototype admin actions, secure in production
     }
+    match /past_papers/{paperId} {
+      allow read, write: if true;
+    }
+    match /subjects/{subjectId} {
+      allow read, write: if true;
+    }
     match /favorites/{favoriteId} {
       allow read, write: if true; // Allow user storage bookmarks
+    }
+    match /user_progress/{progressId} {
+      allow read, write: if true; // Allow reading and saving progress
     }
   }
 }
